@@ -12,6 +12,7 @@ MYSQLD=mysqld
 
 DEFAULT=/etc/default/$MYSQLD
 LOGGER="/usr/bin/logger -p user.err -s -t $MYSQLD"
+[ -x /usr/bin/logger ] || LOGGER=echo
 PROG=/usr/bin/$MYSQLD
 
 unset MY_ARGS MY_GROUP MY_USER
@@ -21,12 +22,19 @@ unset MY_ARGS MY_GROUP MY_USER
 my_user="${MY_USER:-mariadb}"
 my_group="${MY_GROUP:-mariadb}"
 
+mysqld_get_param() {
+	$PROG --print-defaults \
+		| tr " " "\n" \
+		| grep -- "--$1" \
+		| tail -n 1 \
+		| cut -d= -f2
+}
+
 start_service() {
-	local conf='/etc/mysql/my.cnf'
-	local datadir="$( sed -nE "s/^\s*datadir\s*=\s*('([^']*)'|\x22([^\x22]*)\x22|(.*\S))\s*$/\2\3\4/p" "$conf" )"
+	local datadir=$(mysqld_get_param datadir)
 
 	[ -d "$datadir" ] || {
-		$LOGGER "datadir '$datadir' in '$conf' does not exist"
+		$LOGGER "datadir '$datadir' does not exist"
 		return 1
 	}
 
@@ -45,7 +53,6 @@ start_service() {
 	procd_open_instance
 
 	procd_set_param command $PROG $MY_ARGS
-	procd_set_param pidfile /var/run/mysqld.pid
 	# forward stderr to logd
 	procd_set_param stderr 1
 
