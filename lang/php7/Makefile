@@ -7,7 +7,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=php
 PKG_VERSION:=7.4.13
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 
 PKG_MAINTAINER:=Michael Heimpold <mhei@heimpold.de>
 PKG_LICENSE:=PHP-3.01
@@ -41,7 +41,8 @@ PHP7_MODULES= \
 
 PKG_CONFIG_DEPENDS:= \
 	$(patsubst %,CONFIG_PACKAGE_php7-mod-%,$(PHP7_MODULES)) \
-	CONFIG_PHP7_LIBXML CONFIG_PHP7_SYSTEMTZDATA
+	CONFIG_PHP7_LIBXML CONFIG_PHP7_SYSTEMTZDATA \
+	CONFIG_PACKAGE_apache-mod-php7
 
 include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/nls.mk
@@ -150,6 +151,20 @@ define Package/php7-mod-intl/description
   However, the data is required to make the ICU library useful - and thus
   directly affects PHPs ICU extension, too - so consider to also
   select/install package 'icu-full-data'.
+endef
+
+define Package/apache-mod-php7
+  $(call Package/php7/Default)
+  SUBMENU:=Web Servers/Proxies
+  SECTION:=net
+  CATEGORY:=Network
+  DEPENDS:= apache +libpcre2 +zlib
+  TITLE:=PHP7 module for Apache Web Server
+endef
+
+define Package/apache-mod-php7/description
+  $(call Package/php7/Default/description)
+  This package contains the PHP module for the Apache Web Server.
 endef
 
 # not everything groks --disable-nls
@@ -464,6 +479,10 @@ else
   CONFIGURE_ARGS+= --without-system-tzdata
 endif
 
+ifneq ($(CONFIG_PACKAGE_apache-mod-php7),)
+  CONFIGURE_ARGS+= --with-apxs2=$(STAGING_DIR)/usr/bin/apxs
+endif
+
 CONFIGURE_VARS+= \
 	ac_cv_c_bigendian_php=$(if $(CONFIG_BIG_ENDIAN),yes,no) \
 	php_cv_cc_rpath="no" \
@@ -528,6 +547,11 @@ define Package/php7-fpm/conffiles
 /etc/config/php7-fpm
 endef
 
+define Package/apache-mod-php7/install
+	$(INSTALL_DIR) $(1)/usr/lib/apache2
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/staging/usr/lib/apache2/libphp7.so $(1)/usr/lib/apache2
+endef
+
 define Build/Prepare
 	$(call Build/Prepare/Default)
 	( cd $(PKG_BUILD_DIR); touch configure.ac; ./buildconf --force )
@@ -586,6 +610,7 @@ $(eval $(call BuildPackage,php7-cgi))
 $(eval $(call BuildPackage,php7-cli))
 $(eval $(call BuildPackage,php7-fastcgi))
 $(eval $(call BuildPackage,php7-fpm))
+$(eval $(call BuildPackage,apache-mod-php7))
 
 #$(eval $(call BuildModule,NAME,TITLE[,PKG DEPENDS]))
 $(eval $(call BuildModule,bcmath,Bcmath))
